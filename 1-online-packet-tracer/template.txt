@@ -1,0 +1,103 @@
+s1
+----
+
+conf t
+
+line vty 0 4
+password cisco
+login
+transport input telnet
+
+vlan 10
+name cse
+
+vlan 20 
+name eee
+
+vlan 99
+name management
+
+int vlan 99
+ip address 192.168.99.2 255.255.255.0
+ip default-gateway 192.168.99.1
+no shutdown
+
+int fa0/5
+switchport mode access
+switchport access vlan 10
+
+int fa0/6
+switchport mode access
+switchport access vlan 20
+
+int fa0/1
+switchport mode trunk
+switchport trunk native vlan 99
+switchport trunk allowed vlan 10,20,99
+
+Router config
+--------------
+int g0/0.10
+encapsulation dot1q 10
+ip address 192.168.10.1 255.255.255.0
+
+int g0/0.20
+encapsulation dot1q 20
+ip address 192.168.20.1 255.255.255.0
+
+int g0/0.99
+encapsulation dot1q 99
+ip address 192.168.99.1 255.255.255.0
+
+// up the trunk
+int g0/0
+no shutdown
+
+// serial port config
+#R2
+int se0/0/0
+ip address 11.0.0.2 255.255.255.252
+clock rate 64000
+no shutdown
+
+ip route 0.0.0.0 0.0.0.0 S0/0/0
+
+#R1
+int se0/0/0
+ip address 11.0.0.1 255.255.255.252
+clock rate 64000
+no shutdown
+
+ip route 0.0.0.0 0.0.0.0 S0/0/0
+
+
+# Acl
+no access-list 101
+
+access-list 101 permit tcp host 192.168.10.5 host 192.168.50.5 eq www
+access-list 101 deny tcp host 192.168.10.5 host 192.168.50.6 eq ftp
+
+access-list 101 deny tcp host 192.168.20.5 host 192.168.50.5 eq www
+access-list 101 permit tcp host 192.168.20.5 host 192.168.50.6 eq ftp
+access-list 101 permit ip any any
+
+int g0/0.10
+ip access-group 101 in
+
+int g0/0.20
+ip access-group 101 in
+
+//// DNAT
+ip nat pool pool1 209.165.200.8 209.165.200.11 netmask 255.255.255.224
+access-list 1 permit 192.168.10.0 0.0.0.255
+ip nat inside source list 1 pool pool1
+
+// access
+int g0/0.10
+ip nat inside
+
+int g0/0.20
+ip nat inside
+
+int s0/3/0
+ip nat outside
